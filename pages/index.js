@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 
 export default function SleeperLuckAnalyzer() {
@@ -7,6 +7,12 @@ export default function SleeperLuckAnalyzer() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [leagueInfo, setLeagueInfo] = useState(null);
+  const [mounted, setMounted] = useState(false);
+
+  // Fix hydration issues
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const loadDemoData = () => {
     const demoData = [
@@ -37,7 +43,6 @@ export default function SleeperLuckAnalyzer() {
     setError('');
     
     try {
-      // Use Next.js API route to avoid CORS issues
       const response = await fetch(`/api/sleeper?leagueId=${leagueId}`);
       const data = await response.json();
       
@@ -55,13 +60,6 @@ export default function SleeperLuckAnalyzer() {
     }
   };
 
-  const getQuadrant = (scored, projected, avgScored, avgProjected) => {
-    if (scored >= avgScored && projected >= avgProjected) return 'Good Teams';
-    if (scored >= avgScored && projected < avgProjected) return 'Lucky Teams';
-    if (scored < avgScored && projected >= avgProjected) return 'Unlucky Teams';
-    return 'Bad Teams';
-  };
-
   const getQuadrantColor = (quadrant) => {
     switch (quadrant) {
       case 'Good Teams': return '#22c55e';
@@ -76,17 +74,31 @@ export default function SleeperLuckAnalyzer() {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       return (
-        <div style={{ backgroundColor: 'white', padding: '12px', border: '1px solid #ccc', borderRadius: '4px' }}>
-          <p style={{ fontWeight: 'bold' }}>{data.name}</p>
-          <p style={{ fontSize: '14px' }}>Avg Scored: {data.scoredPoints.toFixed(1)}</p>
-          <p style={{ fontSize: '14px' }}>Avg Projected: {data.projectedPoints.toFixed(1)}</p>
-          <p style={{ fontSize: '14px' }}>Category: <span style={{ fontWeight: 'bold' }}>{data.quadrant}</span></p>
-          <p style={{ fontSize: '12px', color: '#666' }}>Weeks played: {data.weeks}</p>
+        <div style={{ backgroundColor: 'white', padding: '12px', border: '1px solid #ccc', borderRadius: '4px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
+          <p style={{ fontWeight: 'bold', margin: '0 0 8px 0' }}>{data.name}</p>
+          <p style={{ fontSize: '14px', margin: '4px 0' }}>Avg Scored: {data.scoredPoints.toFixed(1)}</p>
+          <p style={{ fontSize: '14px', margin: '4px 0' }}>Avg Projected: {data.projectedPoints.toFixed(1)}</p>
+          <p style={{ fontSize: '14px', margin: '4px 0' }}>Category: <span style={{ fontWeight: 'bold' }}>{data.quadrant}</span></p>
+          <p style={{ fontSize: '12px', color: '#666', margin: '4px 0' }}>Weeks played: {data.weeks}</p>
         </div>
       );
     }
     return null;
   };
+
+  // Don't render chart until component is mounted (avoids SSR issues)
+  if (!mounted) {
+    return (
+      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '24px', backgroundColor: 'white', fontFamily: 'Arial, sans-serif' }}>
+        <div style={{ textAlign: 'center', padding: '50px' }}>
+          <h1 style={{ fontSize: '32px', fontWeight: 'bold', color: '#1f2937' }}>
+            Fantasy Football Team Luck Analyzer
+          </h1>
+          <p>Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   const avgProjected = teamData.length > 0 
     ? teamData.reduce((sum, team) => sum + team.projectedPoints, 0) / teamData.length 
@@ -105,7 +117,7 @@ export default function SleeperLuckAnalyzer() {
           Enter your Sleeper league ID to see how lucky your teams have been this season
         </p>
         
-        <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', marginBottom: '16px' }}>
+        <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', marginBottom: '16px', flexWrap: 'wrap' }}>
           <input
             type="text"
             placeholder="Enter Sleeper League ID"
@@ -116,7 +128,8 @@ export default function SleeperLuckAnalyzer() {
               border: '1px solid #d1d5db', 
               borderRadius: '8px',
               outline: 'none',
-              fontSize: '16px'
+              fontSize: '16px',
+              minWidth: '200px'
             }}
             onKeyPress={(e) => e.key === 'Enter' && fetchLeagueData()}
           />
@@ -153,14 +166,14 @@ export default function SleeperLuckAnalyzer() {
 
         {error && (
           <div style={{ color: '#ef4444', textAlign: 'center', marginBottom: '16px', padding: '12px', backgroundColor: '#fef2f2', borderRadius: '8px' }}>
-            <p style={{ fontWeight: 'bold' }}>Error: {error}</p>
+            <p style={{ fontWeight: 'bold', margin: 0 }}>Error: {error}</p>
           </div>
         )}
 
         {leagueInfo && (
           <div style={{ textAlign: 'center', marginBottom: '16px', padding: '12px', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
-            <h2 style={{ fontSize: '20px', fontWeight: 'bold' }}>{leagueInfo.name}</h2>
-            <p style={{ color: '#6b7280' }}>Season {leagueInfo.season} • {leagueInfo.total_rosters} teams</p>
+            <h2 style={{ fontSize: '20px', fontWeight: 'bold', margin: '0 0 8px 0' }}>{leagueInfo.name}</h2>
+            <p style={{ color: '#6b7280', margin: 0 }}>Season {leagueInfo.season} • {leagueInfo.total_rosters} teams</p>
           </div>
         )}
       </div>
@@ -206,7 +219,7 @@ export default function SleeperLuckAnalyzer() {
             </ResponsiveContainer>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', textAlign: 'center', fontSize: '14px', fontWeight: 'bold', marginBottom: '32px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', textAlign: 'center', fontSize: '14px', fontWeight: 'bold', marginBottom: '32px' }}>
             <div style={{ backgroundColor: '#dcfce7', padding: '12px', borderRadius: '8px' }}>
               <div style={{ color: '#166534' }}>GOOD TEAMS</div>
               <div style={{ fontSize: '12px', color: '#22c55e', marginTop: '4px' }}>High Scored, High Projected</div>
@@ -239,10 +252,12 @@ export default function SleeperLuckAnalyzer() {
                       alignItems: 'center', 
                       padding: '12px', 
                       backgroundColor: '#f9fafb', 
-                      borderRadius: '8px' 
+                      borderRadius: '8px',
+                      flexWrap: 'wrap',
+                      gap: '8px'
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                       <span style={{ fontWeight: 'bold', color: '#6b7280' }}>#{index + 1}</span>
                       <span style={{ fontWeight: 'medium' }}>{team.name}</span>
                       <span 
