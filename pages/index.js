@@ -1,5 +1,70 @@
 import React, { useState, useEffect } from 'react';
-import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
+import dynamic from 'next/dynamic';
+
+// Dynamically import the chart component to avoid SSR issues
+const DynamicScatterChart = dynamic(
+  () => import('recharts').then((recharts) => {
+    const { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } = recharts;
+    
+    return function Chart({ teamData, avgScored, avgProjected, getQuadrantColor }) {
+      const CustomTooltip = ({ active, payload }) => {
+        if (active && payload && payload.length) {
+          const data = payload[0].payload;
+          return (
+            <div style={{ backgroundColor: 'white', padding: '12px', border: '1px solid #ccc', borderRadius: '4px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
+              <p style={{ fontWeight: 'bold', margin: '0 0 8px 0' }}>{data.name}</p>
+              <p style={{ fontSize: '14px', margin: '4px 0' }}>Avg Scored: {data.scoredPoints.toFixed(1)}</p>
+              <p style={{ fontSize: '14px', margin: '4px 0' }}>Avg Projected: {data.projectedPoints.toFixed(1)}</p>
+              <p style={{ fontSize: '14px', margin: '4px 0' }}>Category: <span style={{ fontWeight: 'bold' }}>{data.quadrant}</span></p>
+              <p style={{ fontSize: '12px', color: '#666', margin: '4px 0' }}>Weeks played: {data.weeks}</p>
+            </div>
+          );
+        }
+        return null;
+      };
+
+      return (
+        <ResponsiveContainer width="100%" height="100%">
+          <ScatterChart margin={{ top: 20, right: 20, bottom: 60, left: 60 }}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis 
+              type="number" 
+              dataKey="scoredPoints" 
+              name="Scored Points"
+              label={{ value: 'Average Scored Points', position: 'insideBottom', offset: -10 }}
+            />
+            <YAxis 
+              type="number" 
+              dataKey="projectedPoints" 
+              name="Projected Points"
+              label={{ value: 'Average Projected Points', angle: -90, position: 'insideLeft' }}
+            />
+            <Tooltip content={<CustomTooltip />} />
+            
+            <ReferenceLine x={avgScored} stroke="#666" strokeDasharray="5 5" />
+            <ReferenceLine y={avgProjected} stroke="#666" strokeDasharray="5 5" />
+            
+            <Scatter data={teamData} fill="#8884d8">
+              {teamData.map((entry, index) => (
+                <circle 
+                  key={index} 
+                  r={6} 
+                  fill={getQuadrantColor(entry.quadrant)}
+                  stroke="#fff"
+                  strokeWidth={2}
+                />
+              ))}
+            </Scatter>
+          </ScatterChart>
+        </ResponsiveContainer>
+      );
+    };
+  }),
+  { 
+    ssr: false,
+    loading: () => <div style={{ height: '400px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Loading chart...</div>
+  }
+);
 
 export default function SleeperLuckAnalyzer() {
   const [leagueId, setLeagueId] = useState('');
@@ -7,12 +72,6 @@ export default function SleeperLuckAnalyzer() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [leagueInfo, setLeagueInfo] = useState(null);
-  const [mounted, setMounted] = useState(false);
-
-  // Fix hydration issues
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const loadDemoData = () => {
     const demoData = [
@@ -69,36 +128,6 @@ export default function SleeperLuckAnalyzer() {
       default: return '#3b82f6';
     }
   };
-
-  const CustomTooltip = ({ active, payload }) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload;
-      return (
-        <div style={{ backgroundColor: 'white', padding: '12px', border: '1px solid #ccc', borderRadius: '4px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-          <p style={{ fontWeight: 'bold', margin: '0 0 8px 0' }}>{data.name}</p>
-          <p style={{ fontSize: '14px', margin: '4px 0' }}>Avg Scored: {data.scoredPoints.toFixed(1)}</p>
-          <p style={{ fontSize: '14px', margin: '4px 0' }}>Avg Projected: {data.projectedPoints.toFixed(1)}</p>
-          <p style={{ fontSize: '14px', margin: '4px 0' }}>Category: <span style={{ fontWeight: 'bold' }}>{data.quadrant}</span></p>
-          <p style={{ fontSize: '12px', color: '#666', margin: '4px 0' }}>Weeks played: {data.weeks}</p>
-        </div>
-      );
-    }
-    return null;
-  };
-
-  // Don't render chart until component is mounted (avoids SSR issues)
-  if (!mounted) {
-    return (
-      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '24px', backgroundColor: 'white', fontFamily: 'Arial, sans-serif' }}>
-        <div style={{ textAlign: 'center', padding: '50px' }}>
-          <h1 style={{ fontSize: '32px', fontWeight: 'bold', color: '#1f2937' }}>
-            Fantasy Football Team Luck Analyzer
-          </h1>
-          <p>Loading...</p>
-        </div>
-      </div>
-    );
-  }
 
   const avgProjected = teamData.length > 0 
     ? teamData.reduce((sum, team) => sum + team.projectedPoints, 0) / teamData.length 
@@ -181,42 +210,12 @@ export default function SleeperLuckAnalyzer() {
       {teamData.length > 0 && (
         <div>
           <div style={{ height: '400px', width: '100%', marginBottom: '32px' }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <ScatterChart margin={{ top: 20, right: 20, bottom: 60, left: 60 }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis 
-                  type="number" 
-                  dataKey="scoredPoints" 
-                  name="Scored Points"
-                  label={{ value: 'Average Scored Points', position: 'insideBottom', offset: -10 }}
-                />
-                <YAxis 
-                  type="number" 
-                  dataKey="projectedPoints" 
-                  name="Projected Points"
-                  label={{ value: 'Average Projected Points', angle: -90, position: 'insideLeft' }}
-                />
-                <Tooltip content={<CustomTooltip />} />
-                
-                <ReferenceLine x={avgScored} stroke="#666" strokeDasharray="5 5" />
-                <ReferenceLine y={avgProjected} stroke="#666" strokeDasharray="5 5" />
-                
-                <Scatter 
-                  data={teamData} 
-                  fill="#8884d8"
-                >
-                  {teamData.map((entry, index) => (
-                    <circle 
-                      key={index} 
-                      r={6} 
-                      fill={getQuadrantColor(entry.quadrant)}
-                      stroke="#fff"
-                      strokeWidth={2}
-                    />
-                  ))}
-                </Scatter>
-              </ScatterChart>
-            </ResponsiveContainer>
+            <DynamicScatterChart 
+              teamData={teamData}
+              avgScored={avgScored}
+              avgProjected={avgProjected}
+              getQuadrantColor={getQuadrantColor}
+            />
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', textAlign: 'center', fontSize: '14px', fontWeight: 'bold', marginBottom: '32px' }}>
